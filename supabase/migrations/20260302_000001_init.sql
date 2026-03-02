@@ -50,22 +50,46 @@ alter table public.profiles enable row level security;
 alter table public.applications enable row level security;
 alter table public.events enable row level security;
 
-create policy if not exists "profiles_select_own" on public.profiles
-for select using (auth.uid() = id);
-create policy if not exists "profiles_upsert_own" on public.profiles
-for all using (auth.uid() = id) with check (auth.uid() = id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles' AND policyname='profiles_select_own') THEN
+    CREATE POLICY profiles_select_own ON public.profiles FOR SELECT USING (auth.uid() = id);
+  END IF;
+END $$;
 
-create policy if not exists "applications_select_own" on public.applications
-for select using (auth.uid() = user_id);
-create policy if not exists "applications_write_own" on public.applications
-for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles' AND policyname='profiles_upsert_own') THEN
+    CREATE POLICY profiles_upsert_own ON public.profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+  END IF;
+END $$;
 
-create policy if not exists "events_select_own" on public.events
-for select using (auth.uid() = user_id);
-create policy if not exists "events_write_own" on public.events
-for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='applications' AND policyname='applications_select_own') THEN
+    CREATE POLICY applications_select_own ON public.applications FOR SELECT USING (auth.uid() = user_id);
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='applications' AND policyname='applications_write_own') THEN
+    CREATE POLICY applications_write_own ON public.applications FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='events' AND policyname='events_select_own') THEN
+    CREATE POLICY events_select_own ON public.events FOR SELECT USING (auth.uid() = user_id);
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='events' AND policyname='events_write_own') THEN
+    CREATE POLICY events_write_own ON public.events FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+  END IF;
+END $$;
 
 -- jobs are readable by authenticated users
 alter table public.jobs enable row level security;
-create policy if not exists "jobs_read_auth" on public.jobs
-for select using (auth.role() = 'authenticated');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='jobs' AND policyname='jobs_read_auth') THEN
+    CREATE POLICY jobs_read_auth ON public.jobs FOR SELECT USING (auth.role() = 'authenticated');
+  END IF;
+END $$;
