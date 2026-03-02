@@ -4,8 +4,15 @@ import { withRetry } from '@/lib/integrations/retry'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
 async function postToOutreachProvider(payload: unknown) {
+  const providerUrl = process.env.OUTREACH_PROVIDER_URL
+
+  // Dev-safe mode: if provider is not configured, emulate accepted send.
+  if (!providerUrl) {
+    return { mocked: true, accepted: true }
+  }
+
   return withRetry(async () => {
-    const response = await fetch('https://example-outreach-provider.invalid/send', {
+    const response = await fetch(providerUrl, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
@@ -45,9 +52,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await postToOutreachProvider(body)
+    const providerResult = await postToOutreachProvider(body)
     return NextResponse.json(
-      { ok: true },
+      { ok: true, mocked: (providerResult as { mocked?: boolean }).mocked === true },
       {
         status: 202,
         headers: {
