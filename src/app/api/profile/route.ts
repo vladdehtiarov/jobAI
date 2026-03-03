@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
 export async function GET(req: NextRequest) {
@@ -9,6 +9,11 @@ export async function GET(req: NextRequest) {
 
   const userId = req.nextUrl.searchParams.get('userId')
   if (!userId) return NextResponse.json({ error: 'userId_required' }, { status: 400 })
+
+  const supabaseAdmin = getSupabaseAdmin()
+  if (!supabaseAdmin) {
+    return NextResponse.json({ profile: null, mocked: true, warning: 'Supabase admin not configured' })
+  }
 
   const { data, error } = await supabaseAdmin.from('profiles').select('*').eq('id', userId).maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -30,6 +35,11 @@ export async function POST(req: NextRequest) {
     target_salary_usd: body.target_salary_usd ?? null,
     linkedin_url: body.linkedin_url ?? null,
     updated_at: new Date().toISOString(),
+  }
+
+  const supabaseAdmin = getSupabaseAdmin()
+  if (!supabaseAdmin) {
+    return NextResponse.json({ profile: payload, mocked: true, warning: 'Supabase admin not configured' })
   }
 
   const { data, error } = await supabaseAdmin.from('profiles').upsert(payload).select('*').single()
