@@ -1,4 +1,5 @@
 'use client'
+import Link from 'next/link'
 import { useState } from 'react'
 
 type Job = { title?: string; company?: string; location?: string }
@@ -44,10 +45,10 @@ export default function JobsPage() {
       {status && <p className="text-sm text-gray-700">{status}</p>}
       <div className="space-y-2">
         {jobs.map((j, i) => (
-          <div key={i} className="border rounded p-3">
+          <Link href={`/jobs/${i+1}`} key={i} className="block border rounded p-3 hover:bg-gray-50">
             <div className="font-medium">{j.title || 'Untitled role'}</div>
             <div className="text-sm text-gray-600">{j.company || 'Unknown company'} • {j.location || 'Unknown location'}</div>
-          </div>
+          </Link>
         ))}
       </div>
     </main>
