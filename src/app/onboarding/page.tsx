@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import ProfileMetricsCard from '@/components/profile/ProfileMetricsCard'
 
 type Form = {
   id: string
@@ -8,6 +9,11 @@ type Form = {
   target_salary_usd: string
   linkedin_url: string
   consent_enrichment: boolean
+}
+
+type Metrics = {
+  score: number
+  rationale: string[]
 }
 
 export default function OnboardingPage() {
@@ -20,6 +26,7 @@ export default function OnboardingPage() {
     consent_enrichment: false,
   })
   const [status, setStatus] = useState('')
+  const [metrics, setMetrics] = useState<Metrics | null>(null)
 
   const update = (k: keyof Form, v: string | boolean) => setForm((s) => ({ ...s, [k]: v }))
 
@@ -39,18 +46,30 @@ export default function OnboardingPage() {
       target_salary_usd: form.target_salary_usd ? Number(form.target_salary_usd) : null,
       linkedin_url: form.linkedin_url || null,
       consent_enrichment: form.consent_enrichment,
+      skills: ['typescript', 'nodejs'],
     }
 
-    const res = await fetch('/api/profile', {
+    const saveRes = await fetch('/api/profile', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      setStatus(`Error: ${data?.error || 'save failed'}`)
+    const saveData = await saveRes.json().catch(() => ({}))
+    if (!saveRes.ok) {
+      setStatus(`Error: ${saveData?.error || 'save failed'}`)
       return
     }
+
+    const scoreRes = await fetch('/api/profile/score', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const scoreData = await scoreRes.json().catch(() => ({}))
+    if (scoreRes.ok) {
+      setMetrics({ score: scoreData.score ?? 0, rationale: scoreData.rationale ?? [] })
+    }
+
     setStatus('Saved to profile API ✅')
   }
 
@@ -79,6 +98,7 @@ export default function OnboardingPage() {
         <button className="px-4 py-2 rounded bg-black text-white" type="submit">Save</button>
       </form>
       {status && <p className="text-sm text-gray-700">{status}</p>}
+      {metrics && <ProfileMetricsCard score={metrics.score} rationale={metrics.rationale} />}
     </main>
   )
 }
