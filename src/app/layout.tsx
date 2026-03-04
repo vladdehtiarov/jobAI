@@ -1,6 +1,9 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next'
+import { Geist, Geist_Mono } from 'next/font/google'
+
+import { validateEnvOnStartup } from '@/lib/env'
+
+import './globals.css'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -11,6 +14,8 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+validateEnvOnStartup()
 
 export const metadata: Metadata = {
   title: "Create Next App",
