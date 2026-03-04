@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { withRetry } from '@/lib/integrations/retry'
+import { getIdempotentResponse, setIdempotentResponse } from '@/lib/security/idempotency-store'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
 async function postToOutreachProvider(payload: unknown) {
@@ -51,10 +52,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Invalid JSON payload' }, { status: 400 })
   }
 
+  const incomingKey = request.headers.get('x-idempotency-key')
+  const idempotencyKey =
+    incomingKey ||
+    `${ip}:${JSON.stringify({ providerUrl: body?.providerUrl ?? null, payload: body?.payload ?? body })}`
+
+  const cached = getIdempotentResponse(idempotencyKey)
+  if (cached) {
+    return NextResponse.json(
+      { ok: true, repeated: true, ...(cached as Record<string, unknown>) },
+      {
+        status: 200,
+        headers: {
+          'x-idempotency-replayed': 'true',
+          'x-ratelimit-remaining': String(limiter.remaining),
+          'x-ratelimit-reset': String(limiter.resetAt),
+        },
+      },
+    )
+  }
+
   try {
     const providerResult = await postToOutreachProvider(body)
+    const responsePayload = { ok: true, mocked: (providerResult as { mocked?: boolean }).mocked === true }
+    setIdempotentResponse(idempotencyKey, responsePayload)
+
     return NextResponse.json(
-      { ok: true, mocked: (providerResult as { mocked?: boolean }).mocked === true },
+      responsePayload,
       {
         status: 202,
         headers: {
