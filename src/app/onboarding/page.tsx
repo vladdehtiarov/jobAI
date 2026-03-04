@@ -1,4 +1,5 @@
 'use client'
+
 import { useState } from 'react'
 import ProfileMetricsCard from '@/components/profile/ProfileMetricsCard'
 
@@ -16,6 +17,75 @@ type Metrics = {
   rationale: string[]
 }
 
+type RequestResult<T> = {
+  ok: boolean
+  status: number | null
+  data: T | null
+  error: string | null
+}
+
+type OnboardingState = 'idle' | 'loading' | 'success' | 'error'
+
+const REQUEST_TIMEOUT_MS = 15000
+
+async function safeJson(response: Response) {
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
+
+async function requestJson<T>(url: string, payload: unknown): Promise<RequestResult<T>> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+
+    const data = await safeJson(response)
+
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        data: null,
+        error: data && typeof data === 'object' && 'error' in data ? String(data.error) : `Request failed with status ${response.status}`,
+      }
+    }
+
+    return {
+      ok: true,
+      status: response.status,
+      data: data as T,
+      error: null,
+    }
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return {
+        ok: false,
+        status: null,
+        data: null,
+        error: 'Request timed out. Please try again.',
+      }
+    }
+
+    return {
+      ok: false,
+      status: null,
+      data: null,
+      error: 'Network error. Please check your connection and retry.',
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export default function OnboardingPage() {
   const [form, setForm] = useState<Form>({
     id: '00000000-0000-0000-0000-000000000000',
@@ -26,6 +96,7 @@ export default function OnboardingPage() {
     consent_enrichment: false,
   })
   const [status, setStatus] = useState('')
+  const [state, setState] = useState<OnboardingState>('idle')
   const [metrics, setMetrics] = useState<Metrics | null>(null)
 
   const update = (k: keyof Form, v: string | boolean) => setForm((s) => ({ ...s, [k]: v }))
@@ -33,12 +104,17 @@ export default function OnboardingPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    setMetrics(null)
+
     if (!form.consent_enrichment) {
-      setStatus('Error: Consent is required before external data enrichment.')
+      setState('error')
+      setStatus('Consent is required before external data enrichment.')
       return
     }
 
-    setStatus('Saving...')
+    setState('loading')
+    setStatus('Saving onboarding profile...')
+
     const payload = {
       id: form.id,
       full_name: form.full_name,
@@ -49,28 +125,29 @@ export default function OnboardingPage() {
       skills: ['typescript', 'nodejs'],
     }
 
-    const saveRes = await fetch('/api/profile', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    const saveData = await saveRes.json().catch(() => ({}))
-    if (!saveRes.ok) {
-      setStatus(`Error: ${saveData?.error || 'save failed'}`)
+    const saveResult = await requestJson<{ error?: string }>('/api/profile', payload)
+    if (!saveResult.ok) {
+      setState('error')
+      setStatus(saveResult.error || 'Failed to save onboarding profile.')
       return
     }
 
-    const scoreRes = await fetch('/api/profile/score', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    const scoreData = await scoreRes.json().catch(() => ({}))
-    if (scoreRes.ok) {
-      setMetrics({ score: scoreData.score ?? 0, rationale: scoreData.rationale ?? [] })
+    setStatus('Profile saved. Calculating profile metrics...')
+
+    const scoreResult = await requestJson<{ score?: number; rationale?: string[]; error?: string }>('/api/profile/score', payload)
+
+    if (!scoreResult.ok) {
+      setState('error')
+      setStatus(scoreResult.error || 'Profile saved, but scoring failed.')
+      return
     }
 
-    setStatus('Saved to profile API ✅')
+    const score = typeof scoreResult.data?.score === 'number' ? scoreResult.data.score : 0
+    const rationale = Array.isArray(scoreResult.data?.rationale) ? scoreResult.data.rationale : []
+
+    setMetrics({ score, rationale })
+    setState('success')
+    setStatus('Onboarding saved and scored successfully ✅')
   }
 
   return (
@@ -95,10 +172,41 @@ export default function OnboardingPage() {
           </span>
         </label>
 
-        <button className="px-4 py-2 rounded bg-black text-white" type="submit">Save</button>
+        <button className="px-4 py-2 rounded bg-black text-white disabled:opacity-60 disabled:cursor-not-allowed" type="submit" disabled={state === 'loading'} data-testid="onboarding-submit">
+          {state === 'loading' ? 'Saving...' : 'Save'}
+        </button>
       </form>
-      {status && <p className="text-sm text-gray-700">{status}</p>}
-      {metrics && <ProfileMetricsCard score={metrics.score} rationale={metrics.rationale} />}
+
+      {status && (
+        <p
+          className={`text-sm ${state === 'error' ? 'text-red-700' : 'text-gray-700'}`}
+          role={state === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+          data-testid="onboarding-status"
+        >
+          {status}
+        </p>
+      )}
+
+      {state === 'loading' && (
+        <section className="border rounded-lg p-4 bg-gray-50 text-sm text-gray-700" data-testid="onboarding-loading">
+          Processing onboarding request...
+        </section>
+      )}
+
+      {state === 'idle' && !metrics && (
+        <section className="border rounded-lg p-4 bg-gray-50 text-sm text-gray-700" data-testid="onboarding-empty">
+          Complete the form and submit to generate profile metrics.
+        </section>
+      )}
+
+      {state === 'error' && !metrics && (
+        <section className="border rounded-lg p-4 bg-red-50 text-sm text-red-700" data-testid="onboarding-error">
+          We could not complete onboarding. Review the error above and try again.
+        </section>
+      )}
+
+      {state === 'success' && metrics && <ProfileMetricsCard score={metrics.score} rationale={metrics.rationale} />}
     </main>
   )
 }
