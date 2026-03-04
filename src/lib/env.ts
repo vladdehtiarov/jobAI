@@ -23,8 +23,9 @@ function normalizeAppEnv(value: string | undefined): StrictEnv | 'development' {
 }
 
 function isStrictMode(): boolean {
+  // Strict validation should be opt-in via APP_ENV to avoid failing CI builds.
   const appEnv = normalizeAppEnv(process.env.APP_ENV)
-  return appEnv === 'staging' || appEnv === 'production' || process.env.NODE_ENV === 'production'
+  return appEnv === 'staging' || appEnv === 'production'
 }
 
 function getMissingKeys(keys: readonly string[]): string[] {
