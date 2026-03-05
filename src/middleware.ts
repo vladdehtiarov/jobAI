@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-//'/onboarding'
-const protectedPaths = ['/jobs']
+
+const protectedPaths = ['/onboarding', '/jobs']
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
