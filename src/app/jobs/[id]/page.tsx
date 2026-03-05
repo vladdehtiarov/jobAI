@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import OutreachDisclaimer from '@/components/legal/OutreachDisclaimer'
 
 type Job = {
   id: string
@@ -63,6 +64,11 @@ export default async function JobDetailsPage({ params }: { params: Promise<{ id:
             <li key={i}>{r}</li>
           ))}
         </ul>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-medium">Before outreach</h2>
+        <OutreachDisclaimer />
       </section>
     </main>
   )
