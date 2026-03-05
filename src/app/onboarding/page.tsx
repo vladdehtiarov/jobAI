@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ProfileMetricsCard from '@/components/profile/ProfileMetricsCard'
 
 type Form = {
@@ -101,6 +101,34 @@ export default function OnboardingPage() {
   const [state, setState] = useState<OnboardingState>('idle')
   const [metrics, setMetrics] = useState<Metrics | null>(null)
 
+  // State to track if the component has mounted on the client
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Load draft from localStorage on initial mount
+  // Load draft from localStorage on initial mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('onboardingDraft')
+    if (savedDraft) {
+      try {
+        const parsedData = JSON.parse(savedDraft)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setForm((prev) => ({ ...prev, ...parsedData }))
+      } catch (e) {
+        // Log error if JSON parsing fails
+        console.error('Failed to parse draft form data', e)
+      }
+    }
+    // Set mounted state to true to trigger client-side rendering
+    setIsMounted(true)
+  }, [])
+
+  // Save form data to localStorage whenever it changes
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem('onboardingDraft', JSON.stringify(form))
+    }
+  }, [form, isMounted])
+
   const update = (k: keyof Form, v: string | boolean) => {
     setForm((s) => ({ ...s, [k]: v }))
     if (errors[k]) {
@@ -195,6 +223,21 @@ export default function OnboardingPage() {
     setMetrics({ score, rationale })
     setState('success')
     setStatus('Onboarding saved and scored successfully ✅')
+
+    // Clear the draft from localStorage on successful submission
+    localStorage.removeItem('onboardingDraft')
+  }
+
+  // Render a loading state while checking localStorage to prevent hydration mismatch
+  if (!isMounted) {
+    return (
+        <div className="min-h-screen bg-gray-950 grid place-items-center p-4">
+          <div className="flex flex-col items-center gap-4 animate-pulse">
+            <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-gray-400 text-sm font-medium">Loading profile data...</p>
+          </div>
+        </div>
+    )
   }
 
   return (
