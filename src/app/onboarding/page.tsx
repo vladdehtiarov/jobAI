@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import ProfileMetricsCard from '@/components/profile/ProfileMetricsCard'
+import { validateOnboarding } from '@/lib/validation/onboarding'
 
 type Form = {
   id: string
