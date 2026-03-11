@@ -24,3 +24,18 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@layer base {
+  /* Fix for WebKit autofill styling to match dark theme */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    /* Use box-shadow to cover the white background with gray-950 */
+    -webkit-box-shadow: 0 0 0 1000px #030712 inset !important;
+    /* Force the text color to gray-100 */
+    -webkit-text-fill-color: #F3F4F6 !important;
+    /* Fix the cursor color */
+    caret-color: #F3F4F6 !important;
+  }
+}
